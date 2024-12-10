@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commons Impact Metrics Dashboard (Beta)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        #category-input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+        .awesomplete {
+            width: 100%;
+        }
+
+        #controls,
+        #pageviews-controls {
+            margin-bottom: 20px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        #pageviews-plot,
+        #category-plot {
+            width: 100%;
+            height: 400px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Commons Impact Metrics Dashboard (Beta)</h1>
+    <p>Select a Category:</p>
+    <input id="category-input" class="awesomplete" placeholder="Search for a category..." />
+    <p id="category-display"></p>
+
+    <div class="section">
+        <h2>Pageviews</h2>
+        <div id="pageviews-controls">
+            <label for="pageviews-wiki-select">Select Wiki:</label>
+            <select id="pageviews-wiki-select">
+                <option value="all-wikis">All Wikis</option>
+                <option value="en.wikipedia">English Wikipedia</option>
+            </select>
+            <label for="pageviews-scope-select">Include Subcategories:</label>
+            <select id="pageviews-scope-select">
+                <option value="shallow">No</option>
+                <option value="deep">Yes</option>
+            </select>
+        </div>
+        <div id="pageviews-plot"></div>
+    </div>
+
+    <div class="section">
+        <h2>Category Metrics</h2>
+        <div id="controls">
+            <label for="time-series">Select Time Series:</label>
+            <select id="time-series">
+                <option value="media-file-count">Total Media Files in Category</option>
+                <option value="media-file-count-deep">Total Media Files in Category and Subcategories</option>
+                <option value="used-media-file-count">Media Files Used in Wiki Pages</option>
+                <option value="used-media-file-count-deep">Media Files Used in Wiki Pages (Including Subcategories)
+                </option>
+                <option value="leveraging-wiki-count">Wikis Using Media Files</option>
+                <option value="leveraging-wiki-count-deep">Wikis Using Media Files (Including Subcategories)</option>
+                <option value="leveraging-page-count">Wiki Pages Using Media Files</option>
+                <option value="leveraging-page-count-deep">Wiki Pages Using Media Files (Including Subcategories)
+                </option>
+            </select>
+        </div>
+        <div id="category-plot"></div>
+    </div>
+
+    <script>
+        async function fetchData(category) {
+            const url = `https://wikimedia.org/api/rest_v1/metrics/commons-analytics/category-metrics-snapshot/${category}/20120101/20241101`;
+            const response = await fetch(url, { headers: { accept: 'application/json' } });
+            if (!response.ok) {
+                throw new Error(`Failed to fetch data: ${response.statusText}`);
+            }
+            return response.json();
+        }
+
+        async function fetchPageviews(category, scope, wiki) {
+            const url = `https://wikimedia.org/api/rest_v1/metrics/commons-analytics/pageviews-per-category-monthly/${category}/${scope}/${wiki}/20120101/20241101`;
+            const response = await fetch(url, { headers: { accept: 'application/json' } });
+            if (!response.ok) {
+                throw new Error(`Failed to fetch pageviews: ${response.statusText}`);
+            }
+            return response.json();
+        }
+
+        async function fetchCategories() {
+            const url = 'assets/commons_category_allow_list.tsv';
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to load categories');
+            const text = await response.text();
+            return text.split('\n').filter(line => line.trim() !== '');
+        }
+
+        function getCategoryFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('category') || 'Files_from_the_Biodiversity_Heritage_Library';
+        }
+
+        function createPlot(data, selectedSeries, plotId, title) {
+            const x = data.items.map(item => item.timestamp);
+            const y = data.items.map(item => item[selectedSeries]);
+
+            const trace = {
+                x,
+                y,
+                type: 'scatter',
+                mode: 'lines+markers',
+                marker: { size: 6 },
+            };
+
+            const layout = {
+                title: title,
+                xaxis: { title: 'Date' },
+                yaxis: { title: selectedSeries.replace(/-/g, ' ') },
+            };
+
+            Plotly.newPlot(plotId, [trace], layout);
+        }
+
+        async function setupAutocomplete() {
+            const input = document.getElementById('category-input');
+            const categories = await fetchCategories();
+
+            new Awesomplete(input, {
+                list: categories,
+                minChars: 1,
+                maxItems: 10,
+            });
+
+            input.addEventListener('awesomplete-selectcomplete', (event) => {
+                const category = event.text.value;
+                window.location.search = `?category=${encodeURIComponent(category)}`;
+            });
+        }
+
+        async function initializeDashboard() {
+            const category = getCategoryFromURL();
+            document.getElementById('category-display').textContent = `Displaying data for category: ${category.replace(/_/g, ' ')}`;
+
+            try {
+                await setupAutocomplete();
+
+                const [snapshotData, initialPageviews] = await Promise.all([
+                    fetchData(category),
+                    fetchPageviews(category, 'shallow', 'all-wikis')
+                ]);
+
+                // Pageviews plot logic
+                const pageviewsWikiSelect = document.getElementById('pageviews-wiki-select');
+                const pageviewsScopeSelect = document.getElementById('pageviews-scope-select');
+
+                async function updatePageviewsPlot() {
+                    const scope = pageviewsScopeSelect.value;
+                    const wiki = pageviewsWikiSelect.value;
+                    const pageviewData = await fetchPageviews(category, scope, wiki);
+                    createPlot(pageviewData, 'pageview-count', 'pageviews-plot', 'Page Views Over Time');
+                }
+
+                pageviewsWikiSelect.addEventListener('change', updatePageviewsPlot);
+                pageviewsScopeSelect.addEventListener('change', updatePageviewsPlot);
+                createPlot(initialPageviews, 'pageview-count', 'pageviews-plot', 'Page Views Over Time');
+
+                // Category metrics plot logic
+                const dropdown = document.getElementById('time-series');
+
+                function updateCategoryPlot() {
+                    const selectedSeries = dropdown.value;
+                    createPlot(snapshotData, selectedSeries, 'category-plot', dropdown.selectedOptions[0]?.text || '');
+                }
+
+                dropdown.addEventListener('change', updateCategoryPlot);
+                updateCategoryPlot();
+            } catch (error) {
+                document.body.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+
+        initializeDashboard();
+    </script>
+</body>
+
+</html>
