@@ -134,11 +134,43 @@
 
             const layout = {
                 title: title,
-                xaxis: { title: 'Date' },
-                yaxis: { title: selectedSeries.replace(/-/g, ' ') },
+                xaxis: { title: 'Date', showline: true },
+                yaxis: { title: selectedSeries.replace(/-/g, ' '), showline: true },
+                margin: { l: 60, r: 20, t: 50, b: 50 },
+            };
+            const config = {
+                displaylogo: false,
+                scrollZoom: false,
+                modeBarButtonsToRemove: [
+                    'pan2d', 'select2d', 'lasso2d', 'zoom2d', //remove toggle spike likes
+                    'hoverCompareCartesian', 'hoverClosestCartesian',
+                    'autoScale2d'
+                ],
+                // We leave 'zoom2d' and 'resetScale2d' to allow minimal zoom in/out and a reset
+                displayModeBar: 'hover',
+                modeBarButtons: [[
+                    'zoomIn2d', 'zoomOut2d',
+                    'resetScale2d',
+                    {
+                        name: 'Download PNG',
+                        icon: Plotly.Icons.camera,
+                        click: function (gd) {
+                            Plotly.downloadImage(gd, { format: 'png', filename: 'plot' });
+                        }
+                    },
+                    {
+                        name: 'Download SVG',
+                        icon: Plotly.Icons.camera,
+                        click: function (gd) {
+                            Plotly.downloadImage(gd, { format: 'svg', filename: 'plot' });
+                        }
+                    }
+                ]],
+                responsive: true
             };
 
-            Plotly.newPlot(plotId, [trace], layout);
+
+            Plotly.newPlot(plotId, [trace], layout, config);
         }
 
         async function setupAutocomplete() {
