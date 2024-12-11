@@ -2,11 +2,11 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Commons Impact Metrics Dashboard (Beta)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.css" />
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         body {
@@ -24,8 +24,8 @@
             width: 100%;
         }
 
-        #controls,
-        #pageviews-controls {
+        #pageviews-controls,
+        #category-controls {
             margin-bottom: 20px;
         }
 
@@ -47,7 +47,7 @@
     <input id="category-input" class="awesomplete" placeholder="Search for a category..." />
     <p id="category-display"></p>
 
-    <div class="section">
+    <div class="section" id="pageviews-section">
         <h2>Pageviews</h2>
         <div id="pageviews-controls">
             <label for="pageviews-wiki-select">Select Wiki:</label>
@@ -64,27 +64,30 @@
         <div id="pageviews-plot"></div>
     </div>
 
-    <div class="section">
+    <div class="section" id="category-section">
         <h2>Category Metrics</h2>
-        <div id="controls">
-            <label for="time-series">Select Time Series:</label>
-            <select id="time-series">
+        <div id="category-controls">
+            <label for="category-time-series">Select Time Series:</label>
+            <select id="category-time-series">
                 <option value="media-file-count">Total Media Files in Category</option>
-                <option value="media-file-count-deep">Total Media Files in Category and Subcategories</option>
                 <option value="used-media-file-count">Media Files Used in Wiki Pages</option>
-                <option value="used-media-file-count-deep">Media Files Used in Wiki Pages (Including Subcategories)
                 </option>
                 <option value="leveraging-wiki-count">Wikis Using Media Files</option>
-                <option value="leveraging-wiki-count-deep">Wikis Using Media Files (Including Subcategories)</option>
                 <option value="leveraging-page-count">Wiki Pages Using Media Files</option>
-                <option value="leveraging-page-count-deep">Wiki Pages Using Media Files (Including Subcategories)
                 </option>
+            </select>
+
+            <label for="category-subcategory-select">Include Subcategories:</label>
+            <select id="category-subcategory-select">
+                <option value="shallow">No</option>
+                <option value="deep">Yes</option>
             </select>
         </div>
         <div id="category-plot"></div>
     </div>
 
     <script>
+        // --------------------- Data Fetching ---------------------
         async function fetchData(category) {
             const url = `https://wikimedia.org/api/rest_v1/metrics/commons-analytics/category-metrics-snapshot/${category}/20120101/20241101`;
             const response = await fetch(url, { headers: { accept: 'application/json' } });
@@ -111,6 +114,7 @@
             return text.split('\n').filter(line => line.trim() !== '');
         }
 
+        // --------------------- Utility Functions ---------------------
         function getCategoryFromURL() {
             const params = new URLSearchParams(window.location.search);
             return params.get('category') || 'Files_from_the_Biodiversity_Heritage_Library';
@@ -153,49 +157,70 @@
             });
         }
 
-        async function initializeDashboard() {
+        // --------------------- Pageviews Dashboard Logic ---------------------
+        async function initializePageviewsDashboard(category) {
+            // Fetch initial data for pageviews
+            const initialPageviews = await fetchPageviews(category, 'shallow', 'all-wikis');
+
+            const pageviewsWikiSelect = document.getElementById('pageviews-wiki-select');
+            const pageviewsScopeSelect = document.getElementById('pageviews-scope-select');
+
+            async function updatePageviewsPlot() {
+                const scope = pageviewsScopeSelect.value;
+                const wiki = pageviewsWikiSelect.value;
+                const pageviewData = await fetchPageviews(category, scope, wiki);
+                createPlot(pageviewData, 'pageview-count', 'pageviews-plot', 'Page Views Over Time');
+            }
+
+            pageviewsWikiSelect.addEventListener('change', updatePageviewsPlot);
+            pageviewsScopeSelect.addEventListener('change', updatePageviewsPlot);
+
+            // Initial render
+            createPlot(initialPageviews, 'pageview-count', 'pageviews-plot', 'Page Views Over Time');
+        }
+
+        // --------------------- Category Dashboard Logic ---------------------
+        async function initializeCategoryDashboard(category) {
+            const snapshotData = await fetchData(category);
+            const timeSeriesDropdown = document.getElementById('category-time-series');
+            const subcategoryDropdown = document.getElementById('category-subcategory-select');
+
+            function updateCategoryPlot() {
+                const selectedSeries = timeSeriesDropdown.value;
+                const includeSubcategories = subcategoryDropdown.value;
+
+                // If the user selects "deep," append "-deep" to the selected series, otherwise use the base series
+                let finalSeries = selectedSeries;
+                if (includeSubcategories === 'deep') {
+                    finalSeries += '-deep';
+                }
+
+                createPlot(snapshotData, finalSeries, 'category-plot', timeSeriesDropdown.selectedOptions[0]?.text || '');
+            }
+
+            timeSeriesDropdown.addEventListener('change', updateCategoryPlot);
+            subcategoryDropdown.addEventListener('change', updateCategoryPlot);
+
+            // Initial render
+            updateCategoryPlot();
+        }
+
+        // --------------------- Initialization Orchestrator ---------------------
+        async function initializeDashboards() {
             const category = getCategoryFromURL();
             document.getElementById('category-display').textContent = `Displaying data for category: ${category.replace(/_/g, ' ')}`;
 
             try {
                 await setupAutocomplete();
-
-                const [snapshotData, initialPageviews] = await Promise.all([
-                    fetchData(category),
-                    fetchPageviews(category, 'shallow', 'all-wikis')
-                ]);
-
-                // Pageviews plot logic
-                const pageviewsWikiSelect = document.getElementById('pageviews-wiki-select');
-                const pageviewsScopeSelect = document.getElementById('pageviews-scope-select');
-
-                async function updatePageviewsPlot() {
-                    const scope = pageviewsScopeSelect.value;
-                    const wiki = pageviewsWikiSelect.value;
-                    const pageviewData = await fetchPageviews(category, scope, wiki);
-                    createPlot(pageviewData, 'pageview-count', 'pageviews-plot', 'Page Views Over Time');
-                }
-
-                pageviewsWikiSelect.addEventListener('change', updatePageviewsPlot);
-                pageviewsScopeSelect.addEventListener('change', updatePageviewsPlot);
-                createPlot(initialPageviews, 'pageview-count', 'pageviews-plot', 'Page Views Over Time');
-
-                // Category metrics plot logic
-                const dropdown = document.getElementById('time-series');
-
-                function updateCategoryPlot() {
-                    const selectedSeries = dropdown.value;
-                    createPlot(snapshotData, selectedSeries, 'category-plot', dropdown.selectedOptions[0]?.text || '');
-                }
-
-                dropdown.addEventListener('change', updateCategoryPlot);
-                updateCategoryPlot();
+                await initializePageviewsDashboard(category);
+                await initializeCategoryDashboard(category);
             } catch (error) {
                 document.body.innerHTML = `<p>Error: ${error.message}</p>`;
             }
         }
 
-        initializeDashboard();
+        // Start everything
+        initializeDashboards();
     </script>
 </body>
 
