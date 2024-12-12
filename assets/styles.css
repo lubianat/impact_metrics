@@ -1,0 +1,45 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+}
+
+#category-input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+}
+
+.awesomplete {
+    width: 100%;
+}
+
+#pageviews-controls,
+#category-controls,
+#ranking-controls {
+    margin-bottom: 20px;
+}
+
+.section {
+    margin-bottom: 40px;
+}
+
+#pageviews-plot,
+#category-plot {
+    width: 100%;
+    height: 400px;
+}
+
+#ranking-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#ranking-table th,
+#ranking-table td {
+    padding: 8px;
+    text-align: left;
+}
+
+#ranking-table th {
+    background: #f2f2f2;
+}
