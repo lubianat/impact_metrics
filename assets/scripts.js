@@ -1,3 +1,4 @@
+
 async function fetchData(category) {
     const url = `https://wikimedia.org/api/rest_v1/metrics/commons-analytics/category-metrics-snapshot/${category}/20120101/20241101`;
     const response = await fetch(url, { headers: { accept: 'application/json' } });
@@ -167,63 +168,65 @@ async function initializeCategoryDashboard(category) {
 }
 
 // --------------------- Ranking Dashboard Logic (DataTables) ---------------------
+
+
+// Helper function to generate year-month pairs
+function generateYearMonthPairs(startYear, startMonth, endYear, endMonth) {
+    const pairs = [];
+    let currentYear = startYear;
+    let currentMonth = startMonth;
+
+    while (currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) {
+        const monthName = new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'short' });
+        pairs.push({ label: `${monthName} ${currentYear}`, value: `${currentYear}-${String(currentMonth).padStart(2, '0')}` });
+        currentMonth++;
+        if (currentMonth > 12) {
+            currentMonth = 1;
+            currentYear++;
+        }
+    }
+    return pairs;
+}
+
 async function initializeRankingDashboard(category) {
     const scopeSelect = document.getElementById('ranking-scope-select');
     const wikiSelect = document.getElementById('ranking-wiki-select');
-    const yearSelect = document.getElementById('ranking-year-select');
-    const monthSelect = document.getElementById('ranking-month-select');
+    const yearMonthSelect = document.getElementById('ranking-year-month-select');
     const rankingTableBody = document.querySelector('#ranking-table tbody');
     const rankingParameters = document.getElementById('ranking-parameters');
+    const showAllBtn = document.getElementById('show-top-pages-all-btn');
 
     let dtInstance = null;
-    let lastItems = []; // Store last successful data
+    let lastItems = [];
+
+    // Populate year-month dropdown
+    const yearMonthOptions = generateYearMonthPairs(2023, 11, 2024, 11);
+    yearMonthSelect.innerHTML = yearMonthOptions.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
 
     async function loadRankingData() {
         const scope = scopeSelect.value;
         const wiki = wikiSelect.value;
-        const year = yearSelect.value;
-        const month = monthSelect.value;
+        const [year, month] = yearMonthSelect.value.split('-'); // Parse year and month
 
-        // Update the parameters title
+        // Update parameters display
         rankingParameters.textContent = `Displaying top viewed media files for category "${category.replace(/_/g, ' ')}", scope: ${scope}, wiki: ${wiki}, date: ${year}-${month}`;
 
-        let data;
         try {
-            data = await fetchTopViewedMedia(category, scope, wiki, year, month);
+            const data = await fetchTopViewedMedia(category, scope, wiki, year, month);
+            const items = data.items || [];
+            if (items.length === 0) throw new Error('No data returned.');
+            lastItems = items; // Save data for fallback
+            updateTable(items);
         } catch (error) {
-            // If fetch fails, show alert and revert to old data if available
             alert('No new data available. Showing previously loaded data.');
-            if (lastItems.length === 0) {
-                // No old data, table stays empty
-                return;
-            } else {
-                updateTable(lastItems);
-                return;
-            }
+            if (lastItems.length > 0) updateTable(lastItems);
         }
-
-        const items = data.items || [];
-
-        if (items.length === 0) {
-            // If no new items, show alert and revert to old data
-            alert('No new data returned. Showing previously loaded data.');
-            if (lastItems.length > 0) {
-                updateTable(lastItems);
-            }
-            return;
-        }
-
-        lastItems = items;
-        updateTable(items);
     }
-
-
 
     async function showPagesForRow(fileName, tdPages, limit) {
         try {
-            const wiki = document.getElementById('ranking-wiki-select').value;
-            const year = document.getElementById('ranking-year-select').value;
-            const month = document.getElementById('ranking-month-select').value;
+            const wiki = wikiSelect.value;
+            const [year, month] = yearMonthSelect.value.split('-'); // Parse year and month
 
             const pagesData = await fetchTopPagesForMediaFile(fileName, wiki, year, month);
             tdPages.innerHTML = '';
@@ -253,92 +256,34 @@ async function initializeRankingDashboard(category) {
         }
     }
 
-    // After defining loadRankingData and updateTable:
-    const showAllBtn = document.getElementById('show-top-pages-all-btn');
-    showAllBtn.addEventListener('click', async () => {
-        // For all rows in the current table, fetch top 3 pages
-        const rows = rankingTableBody.querySelectorAll('tr');
-        for (const row of rows) {
-            const fileName = row.getAttribute('data-filename');
-            const tdPages = row.querySelector('td:nth-child(5)'); // 5th column is Top Pages
-            // Only if tdPages and fileName exist
-            if (fileName && tdPages) {
-                await showPagesForRow(fileName, tdPages, 3);
-            }
-        }
-    });
-
     function updateTable(items) {
         rankingTableBody.innerHTML = '';
-
-        const wiki = document.getElementById('ranking-wiki-select').value; // Get current wiki setting
-
-        for (const item of items) {
+        items.forEach(item => {
             const tr = document.createElement('tr');
-            const fileName = item['media-file'];
-            tr.setAttribute('data-filename', fileName);
-
-            // Rank
-            const tdRank = document.createElement('td');
-            tdRank.textContent = item.rank;
-            tr.appendChild(tdRank);
-
-            // Media File (with spaces, link to Commons)
-            const commonsLink = `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(fileName)}`;
-            const displayFileName = fileName.replace(/_/g, ' ');
-            const tdFile = document.createElement('td');
-            const fileLink = document.createElement('a');
-            fileLink.href = commonsLink;
-            fileLink.target = '_blank';
-            fileLink.textContent = displayFileName;
-            tdFile.appendChild(fileLink);
-            tr.appendChild(tdFile);
-
-            // Pageview Count
-            const tdViews = document.createElement('td');
-            tdViews.textContent = item['pageview-count'];
-            tr.appendChild(tdViews);
-
-            // Thumbnail (image clickable to Commons)
-            const tdThumb = document.createElement('td');
-            const thumbUrl = `https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(fileName)}?width=100`;
-            const thumbLink = document.createElement('a');
-            thumbLink.href = commonsLink;
-            thumbLink.target = '_blank';
-
-            const img = document.createElement('img');
-            img.src = thumbUrl;
-            img.alt = displayFileName;
-            img.style.maxWidth = '100px';
-
-            thumbLink.appendChild(img);
-            tdThumb.appendChild(thumbLink);
-            tr.appendChild(tdThumb);
-
-            // Top Pages column
-            const tdPages = document.createElement('td');
-
-            if (wiki === 'en.wikipedia') {
-                const pagesButton = document.createElement('button');
-                pagesButton.textContent = 'Show Top Pages';
-                pagesButton.addEventListener('click', () => showPagesForRow(fileName, tdPages, 3));
-                tdPages.appendChild(pagesButton);
-            } else {
-                // If not English Wikipedia, show a note instead of the button
-                tdPages.textContent = 'Origin pages not available for all-wikis.';
-            }
-
-            tr.appendChild(tdPages);
+            tr.setAttribute('data-filename', item['media-file']);
+            tr.innerHTML = `
+                <td>${item.rank}</td>
+                <td><a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(item['media-file'])}" target="_blank">${item['media-file'].replace(/_/g, ' ')}</a></td>
+                <td>${item['pageview-count']}</td>
+                <td>
+                    <a href="https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(item['media-file'])}?width=100" target="_blank">
+                        <img src="https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(item['media-file'])}?width=100" alt="${item['media-file']}" style="max-width: 100px;">
+                    </a>
+                </td>
+                <td><button>Show Top Pages</button></td>
+            `;
+            const tdPages = tr.querySelector('td:nth-child(5)');
+            const showPagesBtn = tdPages.querySelector('button');
+            showPagesBtn.addEventListener('click', () => showPagesForRow(item['media-file'], tdPages, 3));
             rankingTableBody.appendChild(tr);
-        }
+        });
 
-        // Initialize or update DataTable
         if (!dtInstance) {
             dtInstance = $('#ranking-table').DataTable({
                 pageLength: 10,
                 lengthChange: false,
                 searching: false,
-                ordering: false
+                ordering: false,
             });
         } else {
             dtInstance.clear();
@@ -347,15 +292,99 @@ async function initializeRankingDashboard(category) {
         }
     }
 
-    // Event listeners
+    // Event listener for "Show Top Pages for All Files" button
+    showAllBtn.addEventListener('click', async () => {
+        const rows = rankingTableBody.querySelectorAll('tr');
+        for (const row of rows) {
+            const fileName = row.getAttribute('data-filename');
+            const tdPages = row.querySelector('td:nth-child(5)'); // 5th column is Top Pages
+            if (fileName && tdPages) {
+                await showPagesForRow(fileName, tdPages, 3);
+            }
+        }
+    });
+
+    // Event listeners for dropdowns
+    yearMonthSelect.addEventListener('change', loadRankingData);
     scopeSelect.addEventListener('change', loadRankingData);
     wikiSelect.addEventListener('change', loadRankingData);
-    yearSelect.addEventListener('change', loadRankingData);
-    monthSelect.addEventListener('change', loadRankingData);
 
-    // Initial load
-    loadRankingData();
+    loadRankingData(); // Initial data load
 }
+async function initializeTopEditorsDashboard(category) {
+    const scopeSelect = document.getElementById('editors-scope-select');
+    const typeSelect = document.getElementById('editors-type-select');
+    const yearMonthSelect = document.getElementById('editors-year-month-select');
+    const editorsTableBody = document.querySelector('#editors-table tbody');
+    const editorsParameters = document.getElementById('editors-parameters');
+
+    let dtInstance = null;
+
+    // Populate year-month dropdown
+    const yearMonthOptions = generateYearMonthPairs(2023, 11, 2024, 11);
+    yearMonthSelect.innerHTML = yearMonthOptions.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+
+    async function loadEditorsData() {
+        const scope = scopeSelect.value;
+        const editType = typeSelect.value;
+        const [year, month] = yearMonthSelect.value.split('-'); // Parse year and month
+
+        // Update parameters display
+        editorsParameters.textContent = `Displaying top editors for category "${category.replace(/_/g, ' ')}", scope: ${scope}, edit type: ${editType}, date: ${year}-${month}`;
+
+        try {
+            const url = `https://wikimedia.org/api/rest_v1/metrics/commons-analytics/top-editors-monthly/${category}/${scope}/${editType}/${year}/${month}`;
+            const response = await fetch(url, { headers: { accept: 'application/json' } });
+
+            if (!response.ok) throw new Error('Failed to fetch data.');
+
+            const data = await response.json();
+            const items = data.items || [];
+            if (items.length === 0) throw new Error('No data returned.');
+            updateTable(items);
+        } catch (error) {
+            alert(`Failed to load top editors: ${error.message}`);
+            if (dtInstance) {
+                dtInstance.clear();
+                dtInstance.draw();
+            }
+        }
+    }
+
+    function updateTable(items) {
+        editorsTableBody.innerHTML = '';
+        items.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.rank}</td>
+                <td>${item['user-name']}</td>
+                <td>${item['edit-count']}</td>
+            `;
+            editorsTableBody.appendChild(tr);
+        });
+
+        if (!dtInstance) {
+            dtInstance = $('#editors-table').DataTable({
+                pageLength: 10,
+                lengthChange: false,
+                searching: false,
+                ordering: false,
+            });
+        } else {
+            dtInstance.clear();
+            dtInstance.rows.add($('#editors-table tbody tr'));
+            dtInstance.draw();
+        }
+    }
+
+    // Event listeners for dropdowns
+    scopeSelect.addEventListener('change', loadEditorsData);
+    typeSelect.addEventListener('change', loadEditorsData);
+    yearMonthSelect.addEventListener('change', loadEditorsData);
+
+    loadEditorsData(); // Initial data load
+}
+
 
 // --------------------- Initialization Orchestrator ---------------------
 async function initializeDashboards() {
@@ -367,6 +396,7 @@ async function initializeDashboards() {
         await initializePageviewsDashboard(category);
         await initializeCategoryDashboard(category);
         await initializeRankingDashboard(category);
+        await initializeTopEditorsDashboard(category);
     } catch (error) {
         document.body.innerHTML = `<p>Error: ${error.message}</p>`;
     }
