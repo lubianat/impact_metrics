@@ -176,17 +176,39 @@ function generateYearMonthPairs(startYear, startMonth, endYear, endMonth) {
     let currentYear = startYear;
     let currentMonth = startMonth;
 
+    // Calculate the last month
+    const today = new Date();
+    let defaultYear = today.getFullYear();
+    let defaultMonth = today.getMonth(); // 0-indexed, so December is 11
+
+    if (defaultMonth === 0) {
+        // Handle edge case for January (set to December of the previous year)
+        defaultYear -= 1;
+        defaultMonth = 12;
+    }
+
+    const defaultValue = `${defaultYear}-${String(defaultMonth).padStart(2, '0')}`;
+
     while (currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) {
         const monthName = new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'short' });
-        pairs.push({ label: `${monthName} ${currentYear}`, value: `${currentYear}-${String(currentMonth).padStart(2, '0')}` });
+        const value = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+
+        pairs.push({
+            label: `${monthName} ${currentYear}`,
+            value: value,
+            isDefault: value === defaultValue // Flag for the default option
+        });
+
         currentMonth++;
         if (currentMonth > 12) {
             currentMonth = 1;
             currentYear++;
         }
     }
+
     return pairs;
 }
+
 
 async function initializeRankingDashboard(category) {
     const scopeSelect = document.getElementById('ranking-scope-select');
@@ -201,7 +223,9 @@ async function initializeRankingDashboard(category) {
 
     // Populate year-month dropdown
     const yearMonthOptions = generateYearMonthPairs(2023, 11, 2024, 11);
-    yearMonthSelect.innerHTML = yearMonthOptions.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+    yearMonthSelect.innerHTML = yearMonthOptions
+        .map(opt => `<option value="${opt.value}" ${opt.isDefault ? 'selected' : ''}>${opt.label}</option>`)
+        .join('');
 
     async function loadRankingData() {
         const scope = scopeSelect.value;
@@ -322,7 +346,9 @@ async function initializeTopEditorsDashboard(category) {
 
     // Populate year-month dropdown
     const yearMonthOptions = generateYearMonthPairs(2023, 11, 2024, 11);
-    yearMonthSelect.innerHTML = yearMonthOptions.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+    yearMonthSelect.innerHTML = yearMonthOptions
+        .map(opt => `<option value="${opt.value}" ${opt.isDefault ? 'selected' : ''}>${opt.label}</option>`)
+        .join('');
 
     async function loadEditorsData() {
         const scope = scopeSelect.value;
@@ -357,7 +383,14 @@ async function initializeTopEditorsDashboard(category) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${item.rank}</td>
-                <td><a href="https://commons.wikimedia.org/wiki/User:${item['user-name']}" target="_blank"> ${item['user-name']}</a></td>
+                <td>
+                ${item['user-name']}
+                <sup>
+                    <a href="https://commons.wikimedia.org/wiki/User:${item['user-name']}" target="_blank">[User]</a> |
+                    <a href="https://commons.wikimedia.org/wiki/User_talk:${item['user-name']}" target="_blank">[Talk]</a> |
+                    <a href="https://commons.wikimedia.org/wiki/Special:Contributions/${item['user-name']}" target="_blank">[Contrib]</a>
+                </sup>
+                </td>
                 <td>${item['edit-count']}</td>
             `;
             editorsTableBody.appendChild(tr);
@@ -396,7 +429,9 @@ async function initializeTopPagesDashboard(category) {
 
     // Populate year-month dropdown
     const yearMonthOptions = generateYearMonthPairs(2023, 11, 2024, 11);
-    yearMonthSelect.innerHTML = yearMonthOptions.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+    yearMonthSelect.innerHTML = yearMonthOptions
+        .map(opt => `<option value="${opt.value}" ${opt.isDefault ? 'selected' : ''}>${opt.label}</option>`)
+        .join('');
 
     async function loadPagesData() {
         const scope = scopeSelect.value;
