@@ -160,6 +160,43 @@
             </div>
         </div>
 
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="card-title">Top Pages by Pageviews</h2>
+                <div id="top-pages-controls" class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="pages-scope-select" class="form-label">Include Subcategories:</label>
+                        <select id="pages-scope-select" class="form-select">
+                            <option value="shallow">No</option>
+                            <option value="deep">Yes</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="pages-wiki-select" class="form-label">Select Wiki:</label>
+                        <select id="pages-wiki-select" class="form-select">
+                            <option value="en.wikipedia">English Wikipedia</option>
+                            <option value="all-wikis">All Wikis</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mt-3">
+                        <label for="pages-year-month-select" class="form-label">Year and Month:</label>
+                        <select id="pages-year-month-select" class="form-select"></select>
+                    </div>
+                </div>
+                <p id="pages-parameters" class="text-muted mt-3"></p>
+                <table id="pages-table" class="table table-striped table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Page Title</th>
+                            <th>Pageview Count</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
         <footer>
             Made by <a href="https://tiago.bio.br/" target="_blank">Tiago Lubiana</a>. Open source at <a
                 href="https://github.com/lubianat/impact_metrics" target="_blank">GitHub</a>. Data pulled from the

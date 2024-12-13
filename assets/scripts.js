@@ -357,7 +357,7 @@ async function initializeTopEditorsDashboard(category) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${item.rank}</td>
-                <td>${item['user-name']}</td>
+                <td><a href="https://commons.wikimedia.org/wiki/User:${item['user-name']}" target="_blank"> ${item['user-name']}</a></td>
                 <td>${item['edit-count']}</td>
             `;
             editorsTableBody.appendChild(tr);
@@ -385,6 +385,106 @@ async function initializeTopEditorsDashboard(category) {
     loadEditorsData(); // Initial data load
 }
 
+async function initializeTopPagesDashboard(category) {
+    const scopeSelect = document.getElementById('pages-scope-select');
+    const wikiSelect = document.getElementById('pages-wiki-select');
+    const yearMonthSelect = document.getElementById('pages-year-month-select');
+    const pagesTableBody = document.querySelector('#pages-table tbody');
+    const pagesParameters = document.getElementById('pages-parameters');
+
+    let dtInstance = null;
+
+    // Populate year-month dropdown
+    const yearMonthOptions = generateYearMonthPairs(2023, 11, 2024, 11);
+    yearMonthSelect.innerHTML = yearMonthOptions.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+
+    async function loadPagesData() {
+        const scope = scopeSelect.value;
+        const wiki = wikiSelect.value;
+        const [year, month] = yearMonthSelect.value.split('-'); // Parse year and month
+
+        // Update parameters display
+        pagesParameters.textContent = `Displaying top pages for category "${category.replace(/_/g, ' ')}", scope: ${scope}, wiki: ${wiki}, date: ${year}-${month}`;
+
+        const tableNote = document.createElement('p');
+        tableNote.id = "all-wikis-note";
+        const noteContainer = pagesParameters.parentNode;
+
+        // Remove any existing note
+        const existingNote = document.getElementById('all-wikis-note');
+        if (existingNote) existingNote.remove();
+
+        if (wiki === "all-wikis") {
+            // Add note when "all-wikis" is selected
+            tableNote.classList.add('text-warning');
+            tableNote.textContent = 'Note: Links are not available for all-wikis.';
+            noteContainer.insertBefore(tableNote, pagesParameters.nextSibling);
+        }
+
+        try {
+            const url = `https://wikimedia.org/api/rest_v1/metrics/commons-analytics/top-pages-per-category-monthly/${category}/${scope}/${wiki}/${year}/${month}`;
+            const response = await fetch(url, { headers: { accept: 'application/json' } });
+
+            if (!response.ok) throw new Error('Failed to fetch data.');
+
+            const data = await response.json();
+            const items = data.items || [];
+            if (items.length === 0) throw new Error('No data returned.');
+            updateTable(items, wiki);
+        } catch (error) {
+            alert(`Failed to load top pages: ${error.message}`);
+            if (dtInstance) {
+                dtInstance.clear();
+                dtInstance.draw();
+            }
+        }
+    }
+
+    function updateTable(items, wiki) {
+        pagesTableBody.innerHTML = '';
+        items.forEach(item => {
+            const tr = document.createElement('tr');
+
+            // Render row with or without links based on wiki
+            if (wiki === "all-wikis") {
+                tr.innerHTML = `
+                    <td>${item.rank}</td>
+                    <td>${item['page-title'].replace(/_/g, ' ')}</td>
+                    <td>${item['pageview-count']}</td>
+                `;
+            } else {
+                tr.innerHTML = `
+                    <td>${item.rank}</td>
+                    <td><a href="https://${wiki}.org/wiki/${encodeURIComponent(item['page-title'])}" target="_blank">${item['page-title'].replace(/_/g, ' ')}</a></td>
+                    <td>${item['pageview-count']}</td>
+                `;
+            }
+
+            pagesTableBody.appendChild(tr);
+        });
+
+        if (!dtInstance) {
+            dtInstance = $('#pages-table').DataTable({
+                pageLength: 10,
+                lengthChange: false,
+                searching: false,
+                ordering: false,
+            });
+        } else {
+            dtInstance.clear();
+            dtInstance.rows.add($('#pages-table tbody tr'));
+            dtInstance.draw();
+        }
+    }
+
+    // Event listeners for dropdowns
+    scopeSelect.addEventListener('change', loadPagesData);
+    wikiSelect.addEventListener('change', loadPagesData);
+    yearMonthSelect.addEventListener('change', loadPagesData);
+
+    loadPagesData(); // Initial data load
+}
+
 
 // --------------------- Initialization Orchestrator ---------------------
 async function initializeDashboards() {
@@ -397,6 +497,7 @@ async function initializeDashboards() {
         await initializeCategoryDashboard(category);
         await initializeRankingDashboard(category);
         await initializeTopEditorsDashboard(category);
+        await initializeTopPagesDashboard(category);
     } catch (error) {
         document.body.innerHTML = `<p>Error: ${error.message}</p>`;
     }
