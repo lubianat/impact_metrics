@@ -1,6 +1,12 @@
+const today = new Date();
+const thisYear = today.getFullYear();
+const thisMonth = today.getMonth() + 1; // getMonth() is zero-based, so add 1
+const lastYear = thisMonth === 1 ? thisYear - 1 : thisYear;
+const lastMonth = thisMonth === 1 ? 12 : thisMonth - 1;
+window.yearMonthOptions = generateYearMonthPairs(2023, 11, lastYear, lastMonth);
 
 async function fetchData(category) {
-    const url = `https://wikimedia.org/api/rest_v1/metrics/commons-analytics/category-metrics-snapshot/${category}/20120101/20241101`;
+    const url = `https://wikimedia.org/api/rest_v1/metrics/commons-analytics/category-metrics-snapshot/${category}/20120101/${thisYear}${String(thisMonth).padStart(2, '0')}01`;
     const response = await fetch(url, { headers: { accept: 'application/json' } });
     if (!response.ok) {
         throw new Error(`Failed to fetch data: ${response.statusText}`);
@@ -9,7 +15,7 @@ async function fetchData(category) {
 }
 
 async function fetchPageviews(category, scope, wiki) {
-    const url = `https://wikimedia.org/api/rest_v1/metrics/commons-analytics/pageviews-per-category-monthly/${category}/${scope}/${wiki}/20120101/20241101`;
+    const url = `https://wikimedia.org/api/rest_v1/metrics/commons-analytics/pageviews-per-category-monthly/${category}/${scope}/${wiki}/20120101/${thisYear}${String(thisMonth).padStart(2, '0')}01`;
     const response = await fetch(url, { headers: { accept: 'application/json' } });
     if (!response.ok) {
         throw new Error(`Failed to fetch pageviews: ${response.statusText}`);
@@ -222,7 +228,7 @@ async function initializeRankingDashboard(category) {
     let lastItems = [];
 
     // Populate year-month dropdown
-    const yearMonthOptions = generateYearMonthPairs(2023, 11, 2024, 11);
+    const yearMonthOptions = window.yearMonthOptions;
     yearMonthSelect.innerHTML = yearMonthOptions
         .map(opt => `<option value="${opt.value}" ${opt.isDefault ? 'selected' : ''}>${opt.label}</option>`)
         .join('');
@@ -345,7 +351,8 @@ async function initializeTopEditorsDashboard(category) {
     let dtInstance = null;
 
     // Populate year-month dropdown
-    const yearMonthOptions = generateYearMonthPairs(2023, 11, 2024, 11);
+    const yearMonthOptions = window.yearMonthOptions;
+
     yearMonthSelect.innerHTML = yearMonthOptions
         .map(opt => `<option value="${opt.value}" ${opt.isDefault ? 'selected' : ''}>${opt.label}</option>`)
         .join('');
@@ -428,7 +435,7 @@ async function initializeTopPagesDashboard(category) {
     let dtInstance = null;
 
     // Populate year-month dropdown
-    const yearMonthOptions = generateYearMonthPairs(2023, 11, 2024, 11);
+    const yearMonthOptions = window.yearMonthOptions
     yearMonthSelect.innerHTML = yearMonthOptions
         .map(opt => `<option value="${opt.value}" ${opt.isDefault ? 'selected' : ''}>${opt.label}</option>`)
         .join('');
