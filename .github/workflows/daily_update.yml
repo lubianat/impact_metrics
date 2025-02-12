@@ -21,7 +21,7 @@ jobs:
         run: pip install requests  # If your script requires additional packages
 
       - name: Run Python Script
-        run: python get_glamorous_counts.py
+        run: python glamorous_tracking/get_glamorous_counts.py
 
       - name: Commit and Push Changes
         run: |
