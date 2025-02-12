@@ -1,0 +1,32 @@
+name: Update Glamorous Counts
+
+on:
+  schedule:
+    - cron: '20 11 * * *'  # Runs every day at 11:10 UTC
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  update_counts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'  # Adjust if needed
+
+      - name: Install Dependencies
+        run: pip install requests  # If your script requires additional packages
+
+      - name: Run Python Script
+        run: python get_glamorous_counts.py
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add usage.tsv
+          git commit -m "Auto update TSV - $(date +'%Y-%m-%d')" || echo "No changes to commit"
+          git push origin main
