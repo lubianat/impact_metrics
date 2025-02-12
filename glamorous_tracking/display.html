@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usage Statistics</title>
+
+    <!-- Include DataTables CSS and JS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            text-align: center;
+        }
+
+        #dataTable {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+
+        select {
+            margin-bottom: 10px;
+            padding: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>Usage Statistics</h2>
+
+    <!-- Date Selector -->
+    <label for="dateSelector">Select Date:</label>
+    <select id="dateSelector"></select>
+
+    <!-- Table -->
+    <table id="dataTable" class="display">
+        <thead>
+            <tr>
+                <th>Project</th>
+                <th>Usage</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        $(document).ready(function () {
+            let tsvFile = "usage.tsv"; // Adjust if stored elsewhere
+
+            // Fetch and process TSV file
+            $.get(tsvFile, function (data) {
+                let lines = data.trim().split("\n");
+                let headers = lines[0].split("\t"); // Extract headers
+
+                let category = headers[0]; // "category"
+                let dateColumn = headers[1]; // "date"
+                let projects = headers.slice(2); // All language-project pairs
+
+                let rows = lines.slice(1).map(line => line.split("\t")); // Extract data rows
+
+                // Extract unique dates and sort them (latest first)
+                let dates = [...new Set(rows.map(row => row[1]))].sort().reverse();
+
+                // Populate date dropdown
+                let dateSelector = $("#dateSelector");
+                dates.forEach(date => {
+                    dateSelector.append(`<option value="${date}">${date}</option>`);
+                });
+
+                // Get latest date
+                let latestDate = dates[0];
+
+                function updateTable(selectedDate) {
+                    let selectedRows = rows.filter(row => row[1] === selectedDate);
+
+                    // Reset table body
+                    $("#dataTable tbody").empty();
+
+                    // Collect usage counts for sorting
+                    let usageData = [];
+                    selectedRows.forEach(row => {
+                        projects.forEach((proj, i) => {
+                            let usage = parseInt(row[i + 2]) || 0;
+                            if (usage > 0) {
+                                usageData.push({ project: proj, usage: usage });
+                            }
+                        });
+                    });
+
+                    // Sort by usage (highest first)
+                    usageData.sort((a, b) => b.usage - a.usage);
+
+                    // Populate table with sorted data
+                    usageData.forEach(item => {
+                        $("#dataTable tbody").append(`<tr><td>${item.project}</td><td>${item.usage}</td></tr>`);
+                    });
+
+                    // Reinitialize DataTables with sorting
+                    $("#dataTable").DataTable().destroy();
+                    $("#dataTable").DataTable({ order: [[1, "desc"]] });
+                }
+
+                // Initialize with latest date
+                updateTable(latestDate);
+
+                // Filter by selected date
+                $("#dateSelector").change(function () {
+                    updateTable($(this).val());
+                });
+
+            }, "text");
+        });
+    </script>
+
+</body>
+
+</html>
