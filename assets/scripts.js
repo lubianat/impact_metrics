@@ -543,6 +543,8 @@ async function initializeDashboards() {
     } catch (error) {
         document.body.innerHTML = `<p>Error: ${error.message}</p>`;
     }
+    var url = 'https://glamtools.toolforge.org/glamorous.php?doit=1&category=' + encodeURIComponent(category) + '&use_globalusage=1&show_details=1&projects%5Bwikipedia%5D=1&projects%5Bwikibooks%5D=1&projects%5Bwikispecies%5D=1&projects%5Bwikidata%5D=1&projects%5Bwikiversity%5D=1';
+    document.getElementById('glamorous-iframe').src = url;
 }
 
 // Start everything
