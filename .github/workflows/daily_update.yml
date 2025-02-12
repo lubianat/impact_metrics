@@ -20,10 +20,6 @@ jobs:
       - name: Install Dependencies
         run: pip install requests  # If needed
 
-      - name: Ensure TSV File Exists
-        run: |
-          touch usage.tsv  # Create the file if it doesn't exist
-
       - name: Run Python Script
         run: python glamorous_tracking/get_glamorous_counts.py
 
@@ -31,7 +27,7 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git add usage.tsv
+          git add glamorous_tracking/usage.tsv
           if ! git diff --cached --quiet; then
             git commit -m "Auto update TSV - $(date +'%Y-%m-%d')"
             git push origin main
