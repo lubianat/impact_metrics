@@ -543,8 +543,17 @@ async function initializeDashboards() {
     } catch (error) {
         document.body.innerHTML = `<p>Error: ${error.message}</p>`;
     }
-    var url = 'https://glamtools.toolforge.org/glamorous.php?doit=1&category=' + encodeURIComponent(category) + '&use_globalusage=1&show_details=1&projects%5Bwikipedia%5D=1&projects%5Bwikibooks%5D=1&projects%5Bwikispecies%5D=1&projects%5Bwikidata%5D=1&projects%5Bwikiversity%5D=1';
-    document.getElementById('glamorous-iframe').src = url;
+
+    // Set up GLAMorous dashboard to load on button click (to avoid 2000+ requests on page load)
+    var glamorousUrl = 'https://glamtools.toolforge.org/glamorous.php?doit=1&category=' + encodeURIComponent(category) + '&use_globalusage=1&show_details=1&projects%5Bwikipedia%5D=1&projects%5Bwikibooks%5D=1&projects%5Bwikispecies%5D=1&projects%5Bwikidata%5D=1&projects%5Bwikiversity%5D=1';
+    document.getElementById('load-glamorous-btn').addEventListener('click', function() {
+        document.getElementById('glamorous-iframe').src = glamorousUrl;
+        document.getElementById('glamorous-container').style.display = 'block';
+        this.style.display = 'none';
+    }, { once: true });
+    // Inject also link in "glamorous-link" element
+    var glamorousLink = document.getElementById('glamorous-link');
+    glamorousLink.href = glamorousUrl;
 }
 
 // Start everything
